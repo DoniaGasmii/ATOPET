@@ -17,7 +17,7 @@ from typing import (
 from communication import Communication
 from expression import (
     Expression,
-    Secret, Scalar, Addition, Multiplication
+    Secret, Scalar, Addition, Multiplication, Subtraction
 )
 from protocol import ProtocolSpec
 from secret_sharing import(
@@ -105,9 +105,27 @@ class SMCParty:
                     return resB
                 else:
                     return resA
+        elif isinstance(expr, Subtraction):
+            resA = self.process_expression(expr.a)
+            resB = self.process_expression(expr.b)
 
+            if ((isinstance(resA, Scalar) or isinstance(resB, Scalar)) and self.lead)\
+                    or (isinstance(resA, Share) and isinstance(resB, Share)):
+                return resA-resB
+
+            else:
+                if isinstance(resA, Scalar):
+                    return resB
+                else:
+                    return resA
         elif isinstance(expr, Multiplication):
-            #TODO
-            raise NotImplementedError
+            resA = self.process_expression(expr.a)
+            resB = self.process_expression(expr.b)
+
+            if isinstance(resA, Scalar) or isinstance(resB, Scalar):
+                return resA*resB
+            else:
+                #TODO
+                raise NotImplementedError
         else:
             raise ValueError("Unknown expression type")

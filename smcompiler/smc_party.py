@@ -93,12 +93,12 @@ class SMCParty:
             return expr
         elif isinstance(expr, (Addition, Subtraction)):
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
-            return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB)
+            return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB) # TODO: finite field check
 
         elif isinstance(expr, Multiplication):
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
-                return resA*resB
+                return resA*resB # TODO: finite field check
             else:
                 #TODO
                 raise NotImplementedError

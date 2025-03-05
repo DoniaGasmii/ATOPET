@@ -17,7 +17,7 @@ from typing import (
 from communication import Communication
 from expression import (
     Expression,
-    Secret
+    Secret, Scalar, Addition, Multiplication
 )
 from protocol import ProtocolSpec
 from secret_sharing import(
@@ -48,20 +48,36 @@ class SMCParty:
             server_host: str,
             server_port: int,
             protocol_spec: ProtocolSpec,
-            value_dict: Dict[Secret, int]
+            value_dict: Dict[Secret, int],
         ):
         self.comm = Communication(server_host, server_port, client_id)
 
         self.client_id = client_id
         self.protocol_spec = protocol_spec
         self.value_dict = value_dict
+        self.lead = client_id == protocol_spec.participant_ids[0]
 
 
     def run(self) -> int:
         """
         The method the client use to do the SMC.
         """
-        raise NotImplementedError("You need to implement this method.")
+
+        for k in self.value_dict.keys():
+            l = share_secret(self.value_dict.get(k), len(self.protocol_spec.participant_ids))
+
+            i = 0
+            for client in self.protocol_spec.participant_ids:
+                self.comm.send_private_message(client, str(k.id.__hash__()), l[i].serialize())
+                i = i + 1
+
+        #process main
+        res = self.process_expression(self.protocol_spec.expr)
+        self.comm.publish_message("result", res.serialize())
+        final_shares = []
+        for client in self.protocol_spec.participant_ids:
+            final_shares.append(Share.deserialize(self.comm.retrieve_public_message(client, "result")))
+        return sum(final_shares, Share(0)).value
 
 
     # Suggestion: To process expressions, make use of the *visitor pattern* like so:
@@ -69,21 +85,29 @@ class SMCParty:
             self,
             expr: Expression
         ):
-        # if expr is an addition operation:
-        #     ...
 
-        # if expr is a multiplication operation:
-        #     ...
+        if isinstance(expr, Secret):
+            buf = self.comm.retrieve_private_message(str(expr.id.__hash__()))
+            val = Share.deserialize(buf)
+            return val
+        elif isinstance(expr, Scalar):
+            return expr
+        elif isinstance(expr, Addition):
+            resA = self.process_expression(expr.a)
+            resB = self.process_expression(expr.b)
 
-        # if expr is a secret:
-        #     ...
+            if ((isinstance(resA, Scalar) or isinstance(resB, Scalar)) and self.lead)\
+                    or (isinstance(resA, Share) and isinstance(resB, Share)):
+                return resA+resB
 
-        # if expr is a scalar:
-        #     ...
-        #
-        # Call specialized methods for each expression type, and have these specialized
-        # methods in turn call `process_expression` on their sub-expressions to process
-        # further.
-        pass
+            else:
+                if isinstance(resA, Scalar):
+                    return resB
+                else:
+                    return resA
 
-    # Feel free to add as many methods as you want.
+        elif isinstance(expr, Multiplication):
+            #TODO
+            raise NotImplementedError
+        else:
+            raise ValueError("Unknown expression type")

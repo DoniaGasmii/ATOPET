@@ -18,4 +18,8 @@ def test_expr_construction():
 
 
 def test():
-    raise NotImplementedError("You can create some tests.")
+    a = Secret(1)
+    b = Secret(2)
+    c = Secret(3)
+    expr = a+b+c
+    assert repr(expr) == "((Secret(1) + Secret(2)) + Secret(3))"

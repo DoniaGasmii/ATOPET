@@ -4,6 +4,8 @@ Secret sharing scheme.
 
 from __future__ import annotations
 
+import json
+import random
 from typing import List
 
 
@@ -12,41 +14,41 @@ class Share:
     A secret share in a finite field.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, value):
         # Adapt constructor arguments as you wish
-        raise NotImplementedError("You need to implement this method.")
+        self.value = value
 
     def __repr__(self):
-        # Helps with debugging.
-        raise NotImplementedError("You need to implement this method.")
+        return str(self.value)
 
     def __add__(self, other):
-        raise NotImplementedError("You need to implement this method.")
+        return Share(self.value + other.value)
 
     def __sub__(self, other):
-        raise NotImplementedError("You need to implement this method.")
+        return Share(self.value - other.value)
 
     def __mul__(self, other):
-        raise NotImplementedError("You need to implement this method.")
+        return Share(self.value * other.value)
 
     def serialize(self):
         """Generate a representation suitable for passing in a message."""
-        raise NotImplementedError("You need to implement this method.")
+        return json.dumps({"value": self.value})
 
     @staticmethod
     def deserialize(serialized) -> Share:
         """Restore object from its serialized representation."""
-        raise NotImplementedError("You need to implement this method.")
+        data = json.loads(serialized)
+        return Share(data["value"])
 
 
 def share_secret(secret: int, num_shares: int) -> List[Share]:
-    """Generate secret shares."""
-    raise NotImplementedError("You need to implement this method.")
+    shares = []
+    for i in range(num_shares-1):
+        shares.append(Share(random.randint(0, secret//num_shares)))
+    shares.append(Share(secret) - sum(shares, Share(0)))
+    print(f"Shares for secret {secret}: {shares}")
+    return shares
 
 
 def reconstruct_secret(shares: List[Share]) -> int:
-    """Reconstruct the secret from shares."""
-    raise NotImplementedError("You need to implement this method.")
-
-
-# Feel free to add as many methods as you want.
+    return sum(shares)

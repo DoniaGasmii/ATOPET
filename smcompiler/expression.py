@@ -13,6 +13,7 @@ import base64
 import random
 from typing import Optional
 
+from secret_sharing import Share
 
 ID_BYTES = 4
 
@@ -39,23 +40,19 @@ class Expression:
         self.id = id
 
     def __add__(self, other):
-        raise NotImplementedError("You need to implement this method.")
+        return Addition(self, other)
 
 
     def __sub__(self, other):
-        raise NotImplementedError("You need to implement this method.")
+        return Subtraction(self, other)
 
 
     def __mul__(self, other):
-        raise NotImplementedError("You need to implement this method.")
+        return Multiplication(self, other)
 
 
     def __hash__(self):
         return hash(self.id)
-
-
-    # Feel free to add as many methods as you like.
-
 
 class Scalar(Expression):
     """Term representing a scalar finite field value."""
@@ -70,33 +67,51 @@ class Scalar(Expression):
 
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({repr(self.value)})"
-
+        id_str = self.id.decode() if isinstance(self.id, bytes) else str(self.id)
+        return f"{self.__class__.__name__}(id={id_str}, value={self.value if self.value is not None else ''})"
 
     def __hash__(self):
         return
-
-
-    # Feel free to add as many methods as you like.
-
 
 class Secret(Expression):
     """Term representing a secret finite field value (variable)."""
 
     def __init__(
             self,
-            id: Optional[bytes] = None
-        ):
+            value: Optional[Share] = None,
+            id: Optional[bytes] = None,
+    ):
         super().__init__(id)
+        self.value = value
 
 
     def __repr__(self):
-        return (
-            f"{self.__class__.__name__}({self.value if self.value is not None else ''})"
-        )
+        id_str = self.id.decode() if isinstance(self.id, bytes) else str(self.id)
+        return f"{self.__class__.__name__}(id={id_str}, value={self.value if self.value is not None else ''})"
 
+class Addition(Expression):
+    def __init__(self, a: Expression, b: Expression, id: Optional[bytes] = None):
+        super().__init__(id)
+        self.a = a
+        self.b = b
 
-    # Feel free to add as many methods as you like.
+    def __repr__(self):
+        return f"({self.a} + {self.b})"
 
+class Subtraction(Expression):
+    def __init__(self, a: Expression, b: Expression, id: Optional[bytes] = None):
+        super().__init__(id)
+        self.a = a
+        self.b = b
 
-# Feel free to add as many classes as you like.
+    def __repr__(self):
+        return f"({self.a} - {self.b})"
+
+class Multiplication(Expression):
+    def __init__(self, a: Expression, b: Expression, id: Optional[bytes] = None):
+        super().__init__(id)
+        self.a = a
+        self.b = b
+
+    def __repr__(self):
+        return f"({self.a} * {self.b})"

@@ -40,15 +40,12 @@ class Share:
         data = json.loads(serialized)
         return Share(data["value"])
 
-
 def share_secret(secret: int, num_shares: int) -> List[Share]:
     shares = []
     for i in range(num_shares-1):
         shares.append(Share(random.randint(0, secret//num_shares)))
     shares.append(Share(secret) - sum(shares, Share(0)))
-    print(f"Shares for secret {secret}: {shares}")
     return shares
-
 
 def reconstruct_secret(shares: List[Share]) -> int:
     return sum(shares)

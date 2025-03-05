@@ -88,40 +88,15 @@ class SMCParty:
 
         if isinstance(expr, Secret):
             buf = self.comm.retrieve_private_message(str(expr.id.__hash__()))
-            val = Share.deserialize(buf)
-            return val
-        elif isinstance(expr, Scalar):
+            return Share.deserialize(buf)
+        elif isinstance(expr, (Scalar, Share)):
             return expr
-        elif isinstance(expr, Addition):
-            resA = self.process_expression(expr.a)
-            resB = self.process_expression(expr.b)
+        elif isinstance(expr, (Addition, Subtraction)):
+            resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
+            return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB)
 
-            if ((isinstance(resA, Scalar) or isinstance(resB, Scalar)) and self.lead)\
-                    or (isinstance(resA, Share) and isinstance(resB, Share)):
-                return resA+resB
-
-            else:
-                if isinstance(resA, Scalar):
-                    return resB
-                else:
-                    return resA
-        elif isinstance(expr, Subtraction):
-            resA = self.process_expression(expr.a)
-            resB = self.process_expression(expr.b)
-
-            if ((isinstance(resA, Scalar) or isinstance(resB, Scalar)) and self.lead)\
-                    or (isinstance(resA, Share) and isinstance(resB, Share)):
-                return resA-resB
-
-            else:
-                if isinstance(resA, Scalar):
-                    return resB
-                else:
-                    return resA
         elif isinstance(expr, Multiplication):
-            resA = self.process_expression(expr.a)
-            resB = self.process_expression(expr.b)
-
+            resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
                 return resA*resB
             else:
@@ -129,3 +104,10 @@ class SMCParty:
                 raise NotImplementedError
         else:
             raise ValueError("Unknown expression type")
+
+    def combine(self, resA: Expression, resB: Expression) -> Share:
+        if ((isinstance(resA, Scalar) or isinstance(resB, Scalar)) and self.lead) \
+                or (isinstance(resA, Share) and isinstance(resB, Share)):
+            return resA + resB
+        return Share(resB.value) if isinstance(resA, Scalar) else resA
+

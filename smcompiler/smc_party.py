@@ -26,6 +26,8 @@ from secret_sharing import(
     Share,
 )
 
+from finite_field import FF
+
 # Feel free to add as many imports as you want.
 
 
@@ -77,7 +79,8 @@ class SMCParty:
         final_shares = []
         for client in self.protocol_spec.participant_ids:
             final_shares.append(Share.deserialize(self.comm.retrieve_public_message(client, "result")))
-        return sum(final_shares, Share(0)).value # TODO: finite field check
+
+        return FF.sum(final_shares)
 
 
     # Suggestion: To process expressions, make use of the *visitor pattern* like so:
@@ -102,13 +105,13 @@ class SMCParty:
         elif isinstance(expr, (Addition, Subtraction)):
             # print(f"PROCESSING EXPRESSION OF TYPE ADD/SUB: {expr}")
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
-            return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB) # TODO: finite field check
+            return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB)
 
         elif isinstance(expr, Multiplication):
             # print(f"PROCESSING EXPRESSION OF TYPE MUL: {expr}")
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
-                return resA*resB # TODO: finite field check
+                return Share(FF.mul(resA, resB))
             else:
                 #TODO
                 raise NotImplementedError
@@ -118,6 +121,6 @@ class SMCParty:
     def combine(self, resA: Expression, resB: Expression) -> Share:
         if ((isinstance(resA, Scalar) or isinstance(resB, Scalar)) and self.lead) \
                 or (isinstance(resA, Share) and isinstance(resB, Share)):
-            return resA + resB
+            return Share(FF.add(resA, resB))
         return Share(resB.value) if isinstance(resA, Scalar) else resA
 

@@ -8,6 +8,8 @@ import json
 import random
 from typing import List
 
+from finite_field import FF
+
 
 class Share:
     """
@@ -41,26 +43,8 @@ class Share:
         return Share(data["value"])
 
 def share_secret(secret: int, num_shares: int) -> List[Share]:
-    # TODO: finite field check
-    shares = []
-    for i in range(num_shares-1):
-        shares.append(Share(random.randint(0, secret//num_shares)))
-    shares.append(Share(secret) - sum(shares, Share(0)))
-
-    """
-    with finite field should be something like
-    shares = []
-    current_sum = 0
-    for i in range(num_shares-1):
-        shares.append(Share(random.randint(0, finite_field.order)))
-        current_sum += shares[-1]
-        current_sum %= finite_field.order # assuming finite field == integers modulo p
-
-    if current_sum < secret:
-        shares.append(Share(secret - current_sum))
-    else:
-        shares.append(Share(finite_field.order - current_sum + secret))
-    """
+    shares = [Share(random.randint(0, FF.order)) for _ in range(num_shares - 1)]
+    shares.append(Share(FF.add(secret, -FF.sum(shares))))
     return shares
 
 def reconstruct_secret(shares: List[Share]) -> int:

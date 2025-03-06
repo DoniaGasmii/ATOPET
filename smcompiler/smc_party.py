@@ -77,7 +77,7 @@ class SMCParty:
         final_shares = []
         for client in self.protocol_spec.participant_ids:
             final_shares.append(Share.deserialize(self.comm.retrieve_public_message(client, "result")))
-        return sum(final_shares, Share(0)).value
+        return sum(final_shares, Share(0)).value # TODO: finite field check
 
 
     # Suggestion: To process expressions, make use of the *visitor pattern* like so:
@@ -87,15 +87,25 @@ class SMCParty:
         ):
 
         if isinstance(expr, Secret):
+            # print(f"PROCESSING EXPRESSION OF TYPE SECRET: {expr}")
+            # print(f"{self.client_id} IS RETRIEVING WITH LABEL {expr.id.__hash__()}")
+            # TODO: check this. We're retrieving shares every time we find them in the expression.
+            # This isn't too bad for the public tests, but it would be better to retrieve all of them
+            # at the beginning in case one variable appears multiple times in the expression.
+            # If we don't, communication costs will start ramping up.
+            # This is something worth mentioning in the report analysis, both if we fix it and if we don't.
             buf = self.comm.retrieve_private_message(str(expr.id.__hash__()))
             return Share.deserialize(buf)
         elif isinstance(expr, (Scalar, Share)):
+            # print(f"PROCESSING EXPRESSION OF TYPE SCALAR/SHARE: {expr}")
             return expr
         elif isinstance(expr, (Addition, Subtraction)):
+            # print(f"PROCESSING EXPRESSION OF TYPE ADD/SUB: {expr}")
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB) # TODO: finite field check
 
         elif isinstance(expr, Multiplication):
+            # print(f"PROCESSING EXPRESSION OF TYPE MUL: {expr}")
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
                 return resA*resB # TODO: finite field check

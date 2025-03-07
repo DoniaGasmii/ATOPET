@@ -1,5 +1,3 @@
-from typing import Iterable
-
 class FiniteField:
     """
     Implemented as a singleton because all parties must do arithmetic in the same finite field
@@ -12,15 +10,14 @@ class FiniteField:
             cls._instance.order = order
         return cls._instance
 
+    def _get_value(self, a) -> int:
+        return a if isinstance(a, int) else a.value
+
     def add(self, a, b) -> int:
-        a_val = a if isinstance(a, int) else a.value
-        b_val = b if isinstance(b, int) else b.value
-        return (a_val + b_val) % self.order
+        return (self._get_value(a) + self._get_value(b)) % self.order
     
     def mul(self, a, b) -> int:
-        a_val = a if isinstance(a, int) else a.value
-        b_val = b if isinstance(b, int) else b.value
-        return (a_val * b_val) % self.order
+        return (self._get_value(a) * self._get_value(b)) % self.order
     
     def sum(self, l) -> int:
         current_sum = 0
@@ -30,5 +27,5 @@ class FiniteField:
         return current_sum
 
     
-prime = 1000000007
+prime = 100000000003
 FF = FiniteField(prime)

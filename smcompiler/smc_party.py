@@ -113,8 +113,22 @@ class SMCParty:
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
                 return Share(FF.mul(resA, resB))
             else:
-                #TODO
-                raise NotImplementedError
+                a, b, c = self.comm.retrieve_beaver_triplet_shares(str(expr.id.__hash__()))
+
+                x_a, y_b = FF.sub(resA, a), FF.sub(resB, b)
+                # It would be more efficient to send only one message, but it's more accurate from the handout
+                # to boradcast both values separately.
+                self.comm.publish_message(f"{expr.id.__hash__()}_x-a", str(x_a))
+                self.comm.publish_message(f"{expr.id.__hash__()}_y-b", str(y_b))
+
+                for participant_id in self.protocol_spec.participant_ids:
+                    x_a = FF.add(x_a, int(self.comm.retrieve_public_message(participant_id, f"{expr.id.__hash__()}_x-a")))
+                    y_b = FF.add(y_b, int(self.comm.retrieve_public_message(participant_id, f"{expr.id.__hash__()}_y-b")))
+
+                z = FF.sum([c, FF.mul(resB, y_b), FF.mul(resB, x_a)])
+                if self.lead:
+                    z = FF.sub(z, FF.mul(x_a, y_b))
+            
         else:
             raise ValueError("Unknown expression type")
 

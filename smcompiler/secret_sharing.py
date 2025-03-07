@@ -44,7 +44,7 @@ class Share:
 
 def share_secret(secret: int, num_shares: int) -> List[Share]:
     shares = [Share(random.randint(0, FF.order)) for _ in range(num_shares - 1)]
-    shares.append(Share(FF.add(secret, -FF.sum(shares))))
+    shares.append(Share(FF.sub(secret, FF.sum(shares))))
     return shares
 
 def reconstruct_secret(shares: List[Share]) -> int:

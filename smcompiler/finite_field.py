@@ -16,6 +16,9 @@ class FiniteField:
     def add(self, a, b) -> int:
         return (self._get_value(a) + self._get_value(b)) % self.order
     
+    def sub(self, a, b) -> int:
+        return (self._get_value(a) - self._get_value(b)) % self.order
+    
     def mul(self, a, b) -> int:
         return (self._get_value(a) * self._get_value(b)) % self.order
     

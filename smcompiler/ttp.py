@@ -50,7 +50,7 @@ class TrustedParamGenerator:
         return self.stored_shares[op_id][client_id]
     
     def _generate_shares(self, op_id: str) -> None:
-        a, b = random.randint(0, FF.order), random.randint(0, FF.order)
+        a, b = random.randint(0, FF.order - 1), random.randint(0, FF.order - 1)
         c = FF.mul(a, b)
 
         a_shares, b_shares, c_shares = [share_secret(x, len(self.participant_ids)) for x in (a, b, c)]

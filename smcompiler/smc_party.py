@@ -67,6 +67,7 @@ class SMCParty:
 
         for k in self.value_dict.keys():
             l = share_secret(self.value_dict.get(k), len(self.protocol_spec.participant_ids))
+            print(f"[ SHARES ] {self.client_id}'s secrets: {l}")
 
             i = 0
             for client in self.protocol_spec.participant_ids:
@@ -90,7 +91,7 @@ class SMCParty:
         ):
 
         if isinstance(expr, Secret):
-            # print(f"PROCESSING EXPRESSION OF TYPE SECRET: {expr}")
+            # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE SECRET: {expr}")
             # print(f"{self.client_id} IS RETRIEVING WITH LABEL {expr.id.__hash__()}")
             # TODO: check this. We're retrieving shares every time we find them in the expression.
             # This isn't too bad for the public tests, but it would be better to retrieve all of them
@@ -100,34 +101,44 @@ class SMCParty:
             buf = self.comm.retrieve_private_message(str(expr.id.__hash__()))
             return Share.deserialize(buf)
         elif isinstance(expr, (Scalar, Share)):
-            # print(f"PROCESSING EXPRESSION OF TYPE SCALAR/SHARE: {expr}")
+            # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE SCALAR/SHARE: {expr}")
             return expr
         elif isinstance(expr, (Addition, Subtraction)):
-            # print(f"PROCESSING EXPRESSION OF TYPE ADD/SUB: {expr}")
+            # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE ADD/SUB: {expr}")
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB)
 
         elif isinstance(expr, Multiplication):
-            # print(f"PROCESSING EXPRESSION OF TYPE MUL: {expr}")
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
+                # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE MUL CONST: {expr}")
                 return Share(FF.mul(resA, resB))
             else:
+                # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE MUL: {expr}")
                 a, b, c = self.comm.retrieve_beaver_triplet_shares(str(expr.id.__hash__()))
 
-                x_a, y_b = FF.sub(resA, a), FF.sub(resB, b)
+                x_a, y_b = Share(FF.sub(resA, a)), Share(FF.sub(resB, b))
                 # It would be more efficient to send only one message, but it's more accurate from the handout
-                # to boradcast both values separately.
-                self.comm.publish_message(f"{expr.id.__hash__()}_x-a", str(x_a))
-                self.comm.publish_message(f"{expr.id.__hash__()}_y-b", str(y_b))
+                # to broadcast both values separately.
+
+                self.comm.publish_message(f"{expr.id.__hash__()}_x-a", x_a.serialize())
+                self.comm.publish_message(f"{expr.id.__hash__()}_y-b", y_b.serialize())
 
                 for participant_id in self.protocol_spec.participant_ids:
-                    x_a = FF.add(x_a, int(self.comm.retrieve_public_message(participant_id, f"{expr.id.__hash__()}_x-a")))
-                    y_b = FF.add(y_b, int(self.comm.retrieve_public_message(participant_id, f"{expr.id.__hash__()}_y-b")))
+                    if participant_id == self.client_id:
+                        continue
 
-                z = FF.sum([c, FF.mul(resB, y_b), FF.mul(resB, x_a)])
+                    r_x_a = Share.deserialize(self.comm.retrieve_public_message(participant_id, f"{expr.id.__hash__()}_x-a"))
+                    x_a = FF.add(x_a, r_x_a)
+
+                    r_y_b = Share.deserialize(self.comm.retrieve_public_message(participant_id, f"{expr.id.__hash__()}_y-b"))
+                    y_b = FF.add(y_b, r_y_b)
+
+                z = FF.sum([FF.mul(x_a, b), FF.mul(y_b, a), c])
                 if self.lead:
-                    z = FF.sub(z, FF.mul(x_a, y_b))
+                    z = FF.add(z, FF.mul(x_a, y_b))
+
+                return Share(z)
             
         else:
             raise ValueError("Unknown expression type")

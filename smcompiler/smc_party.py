@@ -27,9 +27,9 @@ from secret_sharing import(
 )
 
 from finite_field import FF
+import random
 
 # Feel free to add as many imports as you want.
-
 
 class SMCParty:
     """
@@ -89,9 +89,15 @@ class SMCParty:
             self,
             expr: Expression
         ):
+        identifier = random.randint(10**10, 10**11 - 1)
+        print(f"[ DEBUG {self.client_id[0]} ] {identifier} PROCESSING EXPRESSION OF TYPE {type(expr)}: {expr}")
+        if isinstance(expr, Addition) or isinstance(expr, Multiplication) or isinstance(expr, Subtraction):
+            print(f"[ DEBUG {self.client_id[0]} ] Left branch expr.a: {expr.a}")
+            print(f"[ DEBUG {self.client_id[0]} ] Left branch expr.b: {expr.b}")
+        else:
+            print(f"[ DEBUG {self.client_id[0]} ] Leaf node reached on: {expr}")
 
         if isinstance(expr, Secret):
-            # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE SECRET: {expr}")
             # print(f"{self.client_id} IS RETRIEVING WITH LABEL {expr.id.__hash__()}")
             # TODO: check this. We're retrieving shares every time we find them in the expression.
             # This isn't too bad for the public tests, but it would be better to retrieve all of them
@@ -99,22 +105,26 @@ class SMCParty:
             # If we don't, communication costs will start ramping up.
             # This is something worth mentioning in the report analysis, both if we fix it and if we don't.
             buf = self.comm.retrieve_private_message(str(expr.id.__hash__()))
-            return Share.deserialize(buf)
+            z = Share.deserialize(buf)
+            print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+            return z
         elif isinstance(expr, (Scalar, Share)):
-            # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE SCALAR/SHARE: {expr}")
-            return expr
+            z = expr
+            print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+            return z
         elif isinstance(expr, (Addition, Subtraction)):
-            # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE ADD/SUB: {expr}")
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
-            return self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB)
+            z = self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB)
+            print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+            return z
 
         elif isinstance(expr, Multiplication):
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
-                # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE MUL CONST: {expr}")
-                return Share(FF.mul(resA, resB))
+                z = Share(FF.mul(resA, resB))
+                print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+                return z
             else:
-                # print(f"[ DEBUG ] PROCESSING EXPRESSION OF TYPE MUL: {expr}")
                 a, b, c = self.comm.retrieve_beaver_triplet_shares(str(expr.id.__hash__()))
 
                 x_a, y_b = Share(FF.sub(resA, a)), Share(FF.sub(resB, b))
@@ -138,6 +148,7 @@ class SMCParty:
                 if self.lead:
                     z = FF.add(z, FF.mul(x_a, y_b))
 
+                print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
                 return Share(z)
             
         else:

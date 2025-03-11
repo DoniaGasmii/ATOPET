@@ -10,16 +10,14 @@ from typing import List
 
 from finite_field import FF
 
-
 class Share:
     """
     A secret share in a finite field.
     """
 
-    def __init__(self, value, isScalar=False):
+    def __init__(self, value):
         # Adapt constructor arguments as you wish
         self.value = value
-        self.isScalar = isScalar
 
     def __repr__(self):
         return str(self.value)

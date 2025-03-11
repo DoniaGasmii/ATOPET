@@ -120,11 +120,10 @@ class SMCParty:
 
         elif isinstance(expr, Multiplication):
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
-            if is_scalar(resA) and is_scalar(resB):
-                if self.lead:
-                    return Share(FF.mul(resA, resB), True)
-                else:
-                    return Share(0, True)
+            if isinstance(resA, Scalar) and isinstance(resB, Scalar):
+                z = Scalar(FF.mul(resA, resB))
+                print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+                return z
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
                 z = Share(FF.mul(resA, resB))
                 print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
@@ -159,20 +158,10 @@ class SMCParty:
         else:
             raise ValueError("Unknown expression type")
 
-    def combine(self, resA: Expression, resB: Expression) -> Share:
-        if is_scalar(resA) and is_scalar(resB):
-            if self.lead:
-                return Share(FF.add(resA, resB), True)
-            else:
-                return Share(0, True)
-        if (is_scalar(resA) or is_scalar(resB) and self.lead) \
-                or (not is_scalar(resA) and not is_scalar(resB)):
-            return Share(FF.add(resA, resB), False)
-        return Share(resB.value) if is_scalar(resA) else resA
-
-def is_scalar(res: Expression) -> bool:
-    if isinstance(res, Scalar):
-        return True
-    if isinstance(res, Share):
-        return res.isScalar
-    return False
+    def combine(self, resA: Expression, resB: Expression) -> Share | Scalar | Expression:
+        if isinstance(resA, Scalar) and isinstance(resB, Scalar):
+            return Scalar(FF.add(resA, resB))
+        if (isinstance(resA, Scalar) or isinstance(resB, Scalar) and self.lead) \
+                or (not isinstance(resA, Scalar) and not isinstance(resB, Scalar)):
+            return Share(FF.add(resA, resB))
+        return Share(resB.value) if isinstance(resA, Scalar) else resA

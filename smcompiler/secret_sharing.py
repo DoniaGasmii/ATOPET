@@ -16,9 +16,10 @@ class Share:
     A secret share in a finite field.
     """
 
-    def __init__(self, value):
+    def __init__(self, value, isScalar=False):
         # Adapt constructor arguments as you wish
         self.value = value
+        self.isScalar = isScalar
 
     def __repr__(self):
         return str(self.value)

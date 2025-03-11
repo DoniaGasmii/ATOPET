@@ -93,13 +93,16 @@ def suite(parties, expr, expected):
 
 def test_suite10():
     """
-    f(a, b) = a + b * (15 + 15 * 3)
+    f(a, b) = a * b * (15 + 15 * 3)
     """
+    alice_secret = Secret()
+    bob_secret = Secret()
+
     parties = {
-        "Alice": dict(),
-        "Bob": dict(),
+        "Alice": {alice_secret: 3},
+        "Bob": {bob_secret: 5},
     }
 
-    expr = Scalar(2) + Scalar(6) + Scalar(7) + Scalar(3) + Scalar(4) + Scalar(5)
-    expected = 2 + 6 + 7 + 3 + 4 + 5
+    expr = alice_secret + bob_secret * (Scalar(15) + Scalar(15) * Scalar(3))
+    expected = 3 + 5 * (15 + 15 * 3)
     suite(parties, expr, expected)

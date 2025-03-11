@@ -10,6 +10,7 @@ MODIFY THIS FILE.
 """
 
 import base64
+import json
 import random
 from typing import Optional
 
@@ -72,6 +73,17 @@ class Scalar(Expression):
 
     def __hash__(self):
         return
+
+    def serialize(self):
+        """Generate a representation suitable for passing in a message."""
+        return json.dumps({"value": self.value})
+
+    @staticmethod
+    def deserialize(serialized) -> Share:
+        """Restore object from its serialized representation."""
+        data = json.loads(serialized)
+        return Share(data["value"])
+
 
 class Secret(Expression):
     """Term representing a secret finite field value (variable)."""

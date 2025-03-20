@@ -75,27 +75,30 @@ def suite(parties, expr, expected):
         assert result == expected
 
 
-def circuit():
+def test_circuit():
     """
-    hashing function with one document provider and 4 third-party SMC participants
-    f(a', b, c, d, e) = K - ba' + ca'^2 - da'^3 + ea^4
-    # TODO addition and multiplication by constants, and subtraction, more constant than just first K
+    Multiple medical providers contribute different pieces of a patient's health data as a score.
+    A circuit gets this data as input and computes the final disease risk score.
+    In this circuit, we have:
+    The patient's age is a public constant K = 50 known by all parties.
+    Doctor A is a cardiologist and provides the Blood Pressure score.
+    Doctor B is a pulmonologist and provides the Smoking History score.
+    Doctor C is an endocrinologist and provides the Diabetes score.
+    Doctor D is the patient's family doctor and provides the patient's Healthy Lifestyle score.
+
+    The disease risk score c is defined by the following formula (values chosen arbitrarily):
+    c = 5 x A + 2 x B x C - D + K
     (computed over a finite field)
     """
-    alice_document, alice_coef = Secret(), Secret()
-    bob_coef = Secret()
-    charlie_coef = Secret()
-    daniel_coef = Secret()
-    eva_coef = Secret()
+
+    doca_secret, docb_secret, docc_secret, docd_secret = Secret(), Secret(), Secret(), Secret()
 
     parties = {
-        "Alice": {alice_document: 146123893, alice_coef: 93943},
-        "Bob": {bob_coef: 1234},
-        "Charlie": {charlie_coef: 42346},
-        "Daniel": {daniel_coef: 462},
-        "Eva": {eva_coef: 752},
+        "DocA": {doca_secret: 30},
+        "DocB": {docb_secret: 100},
+        "DocC": {docc_secret: 10},
+        "DocD": {docd_secret: 2},
     }
-
-    expr = (alice_coef + alice_coef * (bob_coef + alice_coef * (charlie_coef + alice_coef * (daniel_coef + alice_coef * eva_coef))))
-    expected = ...
+    expr = ((Scalar(5) * doca_secret) + (docb_secret * docc_secret) - docd_secret + Scalar(50))
+    expected = (5 * 30) + (100 * 10) - 2 + 50
     suite(parties, expr, expected)

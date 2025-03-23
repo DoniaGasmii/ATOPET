@@ -158,7 +158,7 @@ class SMCParty:
         else:
             raise ValueError("Unknown expression type")
 
-    def combine(self, resA: Expression, resB: Expression) -> Share | Scalar | Expression:
+    def combine(self, resA: Expression, resB: Expression) -> Union[Share, Scalar, Expression]:
         if isinstance(resA, Scalar) and isinstance(resB, Scalar):
             return Scalar(FF.add(resA, resB))
         if (isinstance(resA, Scalar) or isinstance(resB, Scalar) and self.lead) \

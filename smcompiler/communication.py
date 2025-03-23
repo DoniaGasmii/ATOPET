@@ -49,7 +49,8 @@ class Communication:
         self.base_url = f"{protocol}://{server_host}:{server_port}"
         self.client_id = client_id
         self.poll_delay = poll_delay
-
+        self.bytes_sent = 0
+        self.bytes_received = 0
 
     def send_private_message(
             self,
@@ -67,8 +68,13 @@ class Communication:
 
         url = f"{self.base_url}/private/{client_id_san}/{receiver_id_san}/{label_san}"
         print(f"POST {url}")
-        requests.post(url, message)
 
+        res = requests.post(url, message)
+        if isinstance(message, str):
+            message_size = len(message.encode())  # convert str to bytes to get accurate size
+        else:
+            message_size = len(message)
+        self.bytes_sent += message_size
 
     def retrieve_private_message(
             self,
@@ -88,6 +94,7 @@ class Communication:
             print(f"GET  {url}")
             res = requests.get(url)
             if res.status_code == 200:
+                self.bytes_received += len(res.content)
                 return res.content
             time.sleep(self.poll_delay)
 
@@ -106,7 +113,12 @@ class Communication:
 
         url = f"{self.base_url}/public/{client_id_san}/{label_san}"
         print(f"POST {url}")
-        requests.post(url, message)
+        res = requests.post(url, message)
+        if isinstance(message, str):
+            message_size = len(message.encode())  # convert str to bytes to get accurate size
+        else:
+            message_size = len(message)
+        self.bytes_sent += message_size
 
 
     def retrieve_public_message(
@@ -130,6 +142,7 @@ class Communication:
             print(f"GET  {url}")
             res = requests.get(url)
             if res.status_code == 200:
+                self.bytes_received += len(res.content)
                 return res.content
             time.sleep(self.poll_delay)
 
@@ -149,4 +162,5 @@ class Communication:
         print(f"GET  {url}")
 
         res = requests.get(url)
+        self.bytes_received += len(res.content)
         return tuple([Share.deserialize(s) for s in json.loads(res.text)]) # type: ignore

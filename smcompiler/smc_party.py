@@ -67,7 +67,7 @@ class SMCParty:
 
         for k in self.value_dict.keys():
             l = share_secret(self.value_dict.get(k), len(self.protocol_spec.participant_ids))
-            print(f"[ SHARES ] {self.client_id}'s secrets: {l}")
+            # print(f"[ SHARES ] {self.client_id}'s secrets: {l}")
 
             i = 0
             for client in self.protocol_spec.participant_ids:
@@ -90,43 +90,38 @@ class SMCParty:
             expr: Expression
         ):
         identifier = random.randint(10**10, 10**11 - 1)
-        print(f"[ DEBUG {self.client_id[0]} ] {identifier} PROCESSING EXPRESSION OF TYPE {type(expr)}: {expr}")
-        if isinstance(expr, Addition) or isinstance(expr, Multiplication) or isinstance(expr, Subtraction):
-            print(f"[ DEBUG {self.client_id[0]} ] Left branch expr.a: {expr.a}")
-            print(f"[ DEBUG {self.client_id[0]} ] Left branch expr.b: {expr.b}")
-        else:
-            print(f"[ DEBUG {self.client_id[0]} ] Leaf node reached on: {expr}")
+        # print(f"[ DEBUG {self.client_id[0]} ] {identifier} PROCESSING EXPRESSION OF TYPE {type(expr)}: {expr}")
+        # if isinstance(expr, Addition) or isinstance(expr, Multiplication) or isinstance(expr, Subtraction):
+            # print(f"[ DEBUG {self.client_id[0]} ] Left branch expr.a: {expr.a}")
+            # print(f"[ DEBUG {self.client_id[0]} ] Left branch expr.b: {expr.b}")
+        # else:
+            # print(f"[ DEBUG {self.client_id[0]} ] Leaf node reached on: {expr}")
 
         if isinstance(expr, Secret):
             # print(f"{self.client_id} IS RETRIEVING WITH LABEL {expr.id.__hash__()}")
-            # TODO: check this. We're retrieving shares every time we find them in the expression.
-            # This isn't too bad for the public tests, but it would be better to retrieve all of them
-            # at the beginning in case one variable appears multiple times in the expression.
-            # If we don't, communication costs will start ramping up.
-            # This is something worth mentioning in the report analysis, both if we fix it and if we don't.
             buf = self.comm.retrieve_private_message(str(expr.id.__hash__()))
             z = Share.deserialize(buf)
-            print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+            # print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
             return z
         elif isinstance(expr, (Scalar, Share)):
             z = expr
-            print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+            # print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
             return z
         elif isinstance(expr, (Addition, Subtraction)):
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             z = self.combine(resA, Share(-resB.value) if isinstance(expr, Subtraction) else resB)
-            print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+            # print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
             return z
 
         elif isinstance(expr, Multiplication):
             resA, resB = self.process_expression(expr.a), self.process_expression(expr.b)
             if isinstance(resA, Scalar) and isinstance(resB, Scalar):
                 z = Scalar(FF.mul(resA, resB))
-                print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+                # print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
                 return z
             if isinstance(resA, Scalar) or isinstance(resB, Scalar):
                 z = Share(FF.mul(resA, resB))
-                print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+                # print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
                 return z
             else:
                 a, b, c = self.comm.retrieve_beaver_triplet_shares(str(expr.id.__hash__()))
@@ -152,7 +147,7 @@ class SMCParty:
                 if self.lead:
                     z = FF.add(z, FF.mul(x_a, y_b))
 
-                print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
+                # print(f"[ DEBUG {self.client_id[0]} ] {identifier} returning: {z}")
                 return Share(z)
             
         else:

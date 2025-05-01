@@ -15,12 +15,13 @@ resembles the original scheme definition. However, you are free to restructure
 the functions provided to resemble a more object-oriented interface.
 """
 
-from typing import Any, List, Tuple, NamedTuple
+from typing import Any, List, Tuple, NamedTuple, Dict
 
 from serialization import jsonpickle
 
 from petrelic.multiplicative.pairing import G1, G2, GT, G1Element, G2Element
-from math import gcd
+from math import gcd # for random generator generation
+from hashlib import shake_256 # for arbitrary output size hash output, to avoid statistical bias from fixed output size hashes
 
 
 # Type hint aliases
@@ -39,11 +40,20 @@ class PublicKey(NamedTuple):
     Y_tilde: List[G2Element]
 
 Signature = Tuple[G1Element, G1Element]
-Attribute = Any
-AttributeMap = Any
-IssueRequest = Any
-BlindSignature = Any
-AnonymousCredential = Any
+Attribute = int
+AttributeMap = Dict[int, Attribute]
+class IssueRequest(NamedTuple):
+    C: G1Element
+    pi: Any
+
+class CommitmentProof(NamedTuple):
+    T: G1Element
+    k: int
+    s0: int
+    ts: Dict[int, int]
+
+BlindSignature = Signature # I don't really see the difference regarding types
+AnonymousCredential = Signature # Same here
 DisclosureProof = Any
 
 
@@ -53,7 +63,7 @@ DisclosureProof = Any
 
 def random_generator(group, generator):
     """ Generate a random cyclic group generator based on a fixed generator """
-    n = int(group.order())
+    n = group.order()
     exp = group.order().random()
     while gcd(exp, n) != 1:
         exp = group.order().random()
@@ -67,10 +77,10 @@ def generate_key(
     """ Generate signer key pair """
     L = len(attributes)
 
-    x = int(G1.order().random())
+    x = G1.order().random()
     y = []
     for i in range(L):
-        y.append(int(G1.order().random()))
+        y.append(G1.order().random())
 
     g = random_generator(G1, G1.generator())
     g_tilde = random_generator(G2, G2.generator())
@@ -142,7 +152,34 @@ def create_issue_request(
 
     *Warning:* You may need to pass state to the `obtain_credential` function.
     """
-    raise NotImplementedError()
+    t = G1.order().random()
+    C = pk.g ** t
+    print("asdfasdfasdf")
+    print(user_attributes)
+    for attribute in user_attributes:
+        print(user_attributes[attribute])
+        C *= pk.Y[attribute] ** user_attributes[attribute]
+
+    # ZKP
+    t0 = G1.order().random()
+    ts = dict()
+    T = pk.g ** t0
+    for attribute in user_attributes:
+        current_t = G1.order().random()
+        ts[attribute] = current_t
+        T *= pk.Y[attribute] ** current_t
+    
+    k = shake_256(f"{g}{[(attribute, pk.Y[attribute]) for attribute in user_attributes]}{C}{T}").digest(int(G1.order()).bit_length() + 1) % G1.order()
+
+    s0 = (k * t + t0) % G1.order()
+    for elem in ts:
+        ts[elem] = (k * user_attributes[elem] + ts[elem]) % G1.order()
+
+    pi = CommitmentProof(T, k, s0, ts)
+
+    # We need to return t so it can be used in obtain_credential,
+    # but it should not be sent to the issuer.
+    return IssueRequest(C, pi), t
 
 
 def sign_issue_request(
@@ -155,18 +192,39 @@ def sign_issue_request(
 
     This corresponds to the "Issuer signing" step in the issuance protocol.
     """
-    raise NotImplementedError()
+    # Verify request ZKP
+    prod = pk.g ** request.pi.s0
+    for attribute in request.pi.ts:
+        prod *= pk.Y[attribute] ** request.pi.ts[attribute]
+
+    prod *= request.pi.T
+
+    assert prod == request.C ** request.pi.k
+
+    # Sign
+    u = G1.order().random()
+
+    left = pk.g ** u
+
+    right = sk.X * request.C
+    for attribute in issuer_attributes:
+        right *= pk.Y[attribute] ** issuer_attributes[attribute]
+
+    right **= u
+
+    return BlindSignature(left, right), issuer_attributes
 
 
 def obtain_credential(
         pk: PublicKey,
-        response: BlindSignature
+        response: BlindSignature,
+        t: int
     ) -> AnonymousCredential:
     """ Derive a credential from the issuer's response
 
     This corresponds to the "Unblinding signature" step.
     """
-    raise NotImplementedError()
+    return (response[0], response[1] * (response[0].inverse() ** t))
 
 
 ## SHOWING PROTOCOL ##

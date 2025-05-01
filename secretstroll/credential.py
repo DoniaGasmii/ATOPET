@@ -15,17 +15,30 @@ resembles the original scheme definition. However, you are free to restructure
 the functions provided to resemble a more object-oriented interface.
 """
 
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, NamedTuple
 
 from serialization import jsonpickle
+
+from petrelic.multiplicative.pairing import G1, G2, GT, G1Element, G2Element
+from math import gcd
 
 
 # Type hint aliases
 # Feel free to change them as you see fit.
 # Maybe at the end, you will not need aliases at all!
-SecretKey = Any
-PublicKey = Any
-Signature = Any
+class SecretKey(NamedTuple):
+    x: int
+    X: G1Element
+    y: List[int]
+
+class PublicKey(NamedTuple):
+    g: G1Element
+    Y: List[G1Element]
+    g_tilde: G2Element
+    X_tilde: G2Element
+    Y_tilde: List[G2Element]
+
+Signature = Tuple[G1Element, G1Element]
 Attribute = Any
 AttributeMap = Any
 IssueRequest = Any
@@ -38,12 +51,40 @@ DisclosureProof = Any
 ## SIGNATURE SCHEME ##
 ######################
 
+def random_generator(group, generator):
+    """ Generate a random cyclic group generator based on a fixed generator """
+    n = int(group.order())
+    exp = group.order().random()
+    while gcd(exp, n) != 1:
+        exp = group.order().random()
+
+    return generator ** exp
+
 
 def generate_key(
         attributes: List[Attribute]
     ) -> Tuple[SecretKey, PublicKey]:
     """ Generate signer key pair """
-    raise NotImplementedError()
+    L = len(attributes)
+
+    x = int(G1.order().random())
+    y = []
+    for i in range(L):
+        y.append(int(G1.order().random()))
+
+    g = random_generator(G1, G1.generator())
+    g_tilde = random_generator(G2, G2.generator())
+
+    X = g ** x
+    X_tilde = g_tilde ** x
+
+    Y = []
+    Y_tilde = []
+    for i in range(L):
+        Y.append(g ** y[i])
+        Y_tilde.append(g_tilde ** y[i])
+
+    return PublicKey(g, y, g_tilde, X_tilde, Y_tilde), SecretKey(x, X, y)
 
 
 def sign(
@@ -51,7 +92,14 @@ def sign(
         msgs: List[bytes]
     ) -> Signature:
     """ Sign the vector of messages `msgs` """
-    raise NotImplementedError()
+    L = len(msgs)
+
+    h = random_generator(G1, G1.generator())
+    exp2 = sk.x
+    for i in range(L):
+        exp2 += sk.y[i] * int.from_bytes(msgs[i], "big")
+
+    return (h, h ** exp2)
 
 
 def verify(
@@ -60,7 +108,22 @@ def verify(
         msgs: List[bytes]
     ) -> bool:
     """ Verify the signature on a vector of messages """
-    raise NotImplementedError()
+    if signature[0].is_neutral_element():
+        return False
+    
+    L = len(msgs)
+
+    # Left hand side
+    prod = pk.X_tilde
+    for i in range(L):
+        prod *= pk.Y_tilde[i] ** int.from_bytes(msgs[i], "big")
+
+    lhs = signature[0].pair(prod)
+
+    # Right hand side
+    rhs = signature[1].pair(pk.g_tilde)
+    
+    return lhs == rhs
 
 
 #################################

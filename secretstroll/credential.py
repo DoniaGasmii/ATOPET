@@ -19,7 +19,7 @@ from typing import Any, List, Tuple, NamedTuple, Dict
 
 from serialization import jsonpickle
 
-from petrelic.multiplicative.pairing import G1, G2, GT, G1Element, G2Element
+from petrelic.multiplicative.pairing import G1, G2, GT, G1Element, G2Element, GTElement
 from math import gcd # for random generator generation
 from hashlib import shake_256 # for arbitrary output size hash output, to avoid statistical bias from fixed output size hashes
 
@@ -27,6 +27,7 @@ from hashlib import shake_256 # for arbitrary output size hash output, to avoid 
 # Type hint aliases
 # Feel free to change them as you see fit.
 # Maybe at the end, you will not need aliases at all!
+GElement = G1Element | G2Element | GTElement
 class SecretKey(NamedTuple):
     x: int
     X: G1Element
@@ -47,21 +48,23 @@ class IssueRequest(NamedTuple):
     pi: Any
 
 class CommitmentProof(NamedTuple):
-    T: G1Element
+    T: GElement
     k: int
     s0: int
     ts: Dict[int, int]
 
 BlindSignature = Signature # I don't really see the difference regarding types
-AnonymousCredential = Signature # Same here
+AnonymousCredential = Tuple[Signature, AttributeMap]
 DisclosureProof = Any
 
-
 ######################
-## SIGNATURE SCHEME ##
+## HELPER FUNCTIONS ##
 ######################
 
-def random_generator(group, generator):
+def random_generator(
+        group,
+        generator: GElement
+    ) -> GElement:
     """ Generate a random cyclic group generator based on a fixed generator """
     n = group.order()
     exp = group.order().random()
@@ -71,9 +74,40 @@ def random_generator(group, generator):
     return generator ** exp
 
 
+def nizkp(
+        basis: Tuple[GElement, List[GElement]],
+        C: GElement,
+        t: int,
+        attributes: AttributeMap
+    ) -> CommitmentProof:
+    # ZKP
+    t0 = G1.order().random()
+    ts = dict()
+    T = basis[0] ** t0
+    for attr_key in attributes:
+        current_t = G1.order().random()
+        ts[attr_key] = current_t
+        T *= basis[1][attr_key] ** current_t
+    
+    string_to_hash = f"{basis[0]}{[(attr_key, basis[1][attr_key]) for attr_key in attributes]}{C}{T}"
+    # We use shake_256 as an extendable output function to make sure the hash output has the same bit length as the group order
+    k = shake_256(string_to_hash.encode()).digest(int(G1.order()).bit_length())
+    k = int.from_bytes(k, "big") % G1.order()
+
+    s0 = (k * t + t0) % G1.order()
+    for elem in ts:
+        ts[elem] = (k * attributes[elem] + ts[elem]) % G1.order()
+
+    return CommitmentProof(T, k, s0, ts)
+
+
+######################
+## SIGNATURE SCHEME ##
+######################
+
 def generate_key(
         attributes: List[Attribute]
-    ) -> Tuple[SecretKey, PublicKey]:
+    ) -> Tuple[PublicKey, SecretKey]:
     """ Generate signer key pair """
     L = len(attributes)
 
@@ -94,7 +128,7 @@ def generate_key(
         Y.append(g ** y[i])
         Y_tilde.append(g_tilde ** y[i])
 
-    return PublicKey(g, y, g_tilde, X_tilde, Y_tilde), SecretKey(x, X, y)
+    return PublicKey(g, Y, g_tilde, X_tilde, Y_tilde), SecretKey(x, X, y)
 
 
 def sign(
@@ -145,7 +179,7 @@ def verify(
 def create_issue_request(
         pk: PublicKey,
         user_attributes: AttributeMap
-    ) -> IssueRequest:
+    ) -> Tuple[IssueRequest, int]:
     """ Create an issuance request
 
     This corresponds to the "user commitment" step in the issuance protocol.
@@ -154,28 +188,15 @@ def create_issue_request(
     """
     t = G1.order().random()
     C = pk.g ** t
-    print("asdfasdfasdf")
-    print(user_attributes)
-    for attribute in user_attributes:
-        print(user_attributes[attribute])
-        C *= pk.Y[attribute] ** user_attributes[attribute]
+    for attr_key, attr_val in user_attributes.items():
+        C *= pk.Y[attr_key] ** attr_val
 
     # ZKP
-    t0 = G1.order().random()
-    ts = dict()
-    T = pk.g ** t0
-    for attribute in user_attributes:
-        current_t = G1.order().random()
-        ts[attribute] = current_t
-        T *= pk.Y[attribute] ** current_t
-    
-    k = shake_256(f"{g}{[(attribute, pk.Y[attribute]) for attribute in user_attributes]}{C}{T}").digest(int(G1.order()).bit_length() + 1) % G1.order()
-
-    s0 = (k * t + t0) % G1.order()
-    for elem in ts:
-        ts[elem] = (k * user_attributes[elem] + ts[elem]) % G1.order()
-
-    pi = CommitmentProof(T, k, s0, ts)
+    basis = (
+        pk.g,
+        pk.Y
+    )
+    pi = nizkp(basis, C, t, user_attributes)
 
     # We need to return t so it can be used in obtain_credential,
     # but it should not be sent to the issuer.
@@ -192,16 +213,24 @@ def sign_issue_request(
 
     This corresponds to the "Issuer signing" step in the issuance protocol.
     """
+    L = len(sk.y)
     # Verify request ZKP
     prod = pk.g ** request.pi.s0
-    for attribute in request.pi.ts:
-        prod *= pk.Y[attribute] ** request.pi.ts[attribute]
+    for attr_key, attr_val in request.pi.ts.items():
+        prod *= pk.Y[attr_key] ** attr_val
 
-    prod *= request.pi.T
-
-    assert prod == request.C ** request.pi.k
+    assert prod == request.C ** request.pi.k * request.pi.T, "User commitment zero-knowledge proof verification failed."
 
     # Sign
+    # This part could be "simplified" to the following if we overlook the difference
+    # between picking a random u \in \mathbb{Z}_p and then assigning left = g ** u, (ABC scheme)
+    # and picking a random generator h \in G_1 (signature scheme)
+    """
+    # Make sure we account for the user_attributes because their y's are in sk too
+    signature = sign(sk, [issuer_attributes[i] if i in issuer_attributes else 0 for i in range(L)])
+    signature = (signature[0], signature[1] * request.C)
+    """
+    # For now we just compute it explicitly
     u = G1.order().random()
 
     left = pk.g ** u
@@ -212,19 +241,23 @@ def sign_issue_request(
 
     right **= u
 
-    return BlindSignature(left, right), issuer_attributes
+    # Not necessary to return issuer_attributes here, the application will handle this being sent to the user
+    # return (left, right), issuer_attributes
+    return (left, right)
 
 
-def obtain_credential(
+def obtain_credential( 
         pk: PublicKey,
         response: BlindSignature,
-        t: int
+        t: int,
+        attributes: AttributeMap
     ) -> AnonymousCredential:
     """ Derive a credential from the issuer's response
 
     This corresponds to the "Unblinding signature" step.
     """
-    return (response[0], response[1] * (response[0].inverse() ** t))
+    # return (response[0], response[1] * (response[0].inverse() ** t))
+    return ((response[0], response[1] // (response[0] ** t)), attributes)
 
 
 ## SHOWING PROTOCOL ##
@@ -236,7 +269,33 @@ def create_disclosure_proof(
         message: bytes
     ) -> DisclosureProof:
     """ Create a disclosure proof """
-    raise NotImplementedError()
+    L = len(pk.Y)
+
+    r, t = G1.order().random(), G1.order().random()
+
+    sigma = credential[0]
+    attributes = credential[1]
+    disclosed_attributes = {k: v for k, v in attributes.items() if k not in hidden_attributes}
+
+    sigma_prime: Signature = (sigma[0] ** r, (sigma[1] * sigma[0] ** t) ** r)
+
+    # ZKP
+    # First we compute the commitment
+    C = sigma_prime[1].pair(pk.g_tilde)
+    for attr_key, attr_val in disclosed_attributes.items():
+        C *= sigma_prime[0].pair(pk.Y_tilde[attr_key]) ** -attr_val
+    
+    C //= sigma_prime[0].pair(pk.X_tilde)
+
+    # Compute zkp
+    basis = (
+        sigma_prime[0].pair(pk.g_tilde),
+        [sigma_prime[0].pair(pk.Y_tilde[i]) for i in attributes]
+    )
+    pi = nizkp(basis, C, t, hidden_attributes)
+
+    return sigma_prime, disclosed_attributes, pi
+    
 
 
 def verify_disclosure_proof(

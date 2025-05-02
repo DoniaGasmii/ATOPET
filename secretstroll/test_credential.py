@@ -32,8 +32,8 @@ def test_correct_credential():
 
     issuer_attributes = {
         1: 1, # Restaurant subscription: True
-        1: 0, # Gym subscription: False
-        1: 1, # Cafe subscription: True
+        2: 0, # Gym subscription: False
+        3: 1, # Cafe subscription: True
     }
     sign_issue_request(sk, pk, request, issuer_attributes)
     

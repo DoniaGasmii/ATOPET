@@ -236,7 +236,7 @@ def sign_issue_request(
     This corresponds to the "Issuer signing" step in the issuance protocol.
     """
     # Verify request ZKP
-    assert verify_nizkp((pk.g, pk.Y), request.C, request.pi), "User commitment zero-knowledge proof verification failed."
+    assert verify_nizkp((pk.g, pk.Y), request.C, request.pi), "User commitment correct computation zero-knowledge proof verification failed."
 
     # Sign
     # This part could be "simplified" to the following if we overlook the difference

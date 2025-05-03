@@ -40,8 +40,7 @@ def test_correct_credential():
     blind_signature = sign_issue_request(sk, pk, request, issuer_attributes)
 
     # disjoint* union of attributes
-    attributes = dict(user_attributes)
-    attributes.update(issuer_attributes)
+    attributes = user_attributes | issuer_attributes
     credential = obtain_credential(pk, blind_signature, t, attributes)
 
     # showing
@@ -68,8 +67,7 @@ def test_incorrect_credential():
     blind_signature = sign_issue_request(sk1, pk1, request, issuer_attributes)
 
     # disjoint* union of attributes
-    attributes = dict(user_attributes)
-    attributes.update(issuer_attributes)
+    attributes = user_attributes | issuer_attributes
     credential = obtain_credential(pk1, blind_signature, t, attributes)
 
     # showing

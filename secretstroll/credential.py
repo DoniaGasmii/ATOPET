@@ -28,6 +28,7 @@ from hashlib import shake_256 # for arbitrary output size hash output, to avoid 
 # Feel free to change them as you see fit.
 # Maybe at the end, you will not need aliases at all!
 GElement = G1Element | G2Element | GTElement
+
 class SecretKey(NamedTuple):
     x: int
     X: G1Element
@@ -43,6 +44,7 @@ class PublicKey(NamedTuple):
 Signature = Tuple[G1Element, G1Element]
 Attribute = int
 AttributeMap = Dict[int, Attribute]
+
 class IssueRequest(NamedTuple):
     C: G1Element
     pi: Any
@@ -54,8 +56,15 @@ class CommitmentProof(NamedTuple):
     ts: Dict[int, int]
 
 BlindSignature = Signature # I don't really see the difference regarding types
-AnonymousCredential = Tuple[Signature, AttributeMap]
-DisclosureProof = Any
+
+class AnonymousCredential(NamedTuple):
+    signature: Signature
+    attributes: AttributeMap
+
+class DisclosureProof(NamedTuple):
+    signature: Signature
+    disclosed_attributes: AttributeMap
+    pi: CommitmentProof
 
 ######################
 ## HELPER FUNCTIONS ##
@@ -80,6 +89,7 @@ def nizkp(
         t: int,
         attributes: AttributeMap
     ) -> CommitmentProof:
+    """ Compute non-interactive zero-knowledge proof of knowledge of secrets t and attributes """
     # ZKP
     t0 = G1.order().random()
     ts = dict()
@@ -100,6 +110,18 @@ def nizkp(
 
     return CommitmentProof(T, k, s0, ts)
 
+
+def verify_nizkp(
+        basis: Tuple[GElement, List[GElement]],
+        C: GElement,
+        pi: CommitmentProof
+    ) -> bool:
+    """ Verify non-interactive zero-knowledge proof """
+    prod = basis[0] ** pi.s0
+    for attr_key, attr_val in pi.ts.items():
+        prod *= basis[1][attr_key] ** attr_val
+
+    return prod == C ** pi.k * pi.T
 
 ######################
 ## SIGNATURE SCHEME ##
@@ -213,13 +235,8 @@ def sign_issue_request(
 
     This corresponds to the "Issuer signing" step in the issuance protocol.
     """
-    L = len(sk.y)
     # Verify request ZKP
-    prod = pk.g ** request.pi.s0
-    for attr_key, attr_val in request.pi.ts.items():
-        prod *= pk.Y[attr_key] ** attr_val
-
-    assert prod == request.C ** request.pi.k * request.pi.T, "User commitment zero-knowledge proof verification failed."
+    assert verify_nizkp((pk.g, pk.Y), request.C, request.pi), "User commitment zero-knowledge proof verification failed."
 
     # Sign
     # This part could be "simplified" to the following if we overlook the difference
@@ -265,8 +282,8 @@ def obtain_credential(
 def create_disclosure_proof(
         pk: PublicKey,
         credential: AnonymousCredential,
-        hidden_attributes: List[Attribute],
-        message: bytes
+        hidden_attributes: List[Attribute] #,
+        # message: bytes
     ) -> DisclosureProof:
     """ Create a disclosure proof """
     L = len(pk.Y)
@@ -275,7 +292,10 @@ def create_disclosure_proof(
 
     sigma = credential[0]
     attributes = credential[1]
+
+    hidden_attributes = set(hidden_attributes) # for efficiency
     disclosed_attributes = {k: v for k, v in attributes.items() if k not in hidden_attributes}
+    hidden_attributes = {k: v for k, v in attributes.items() if k in hidden_attributes}
 
     sigma_prime: Signature = (sigma[0] ** r, (sigma[1] * sigma[0] ** t) ** r)
 
@@ -290,21 +310,39 @@ def create_disclosure_proof(
     # Compute zkp
     basis = (
         sigma_prime[0].pair(pk.g_tilde),
-        [sigma_prime[0].pair(pk.Y_tilde[i]) for i in attributes]
+        [sigma_prime[0].pair(pk.Y_tilde[i]) for i in range(L)]
     )
     pi = nizkp(basis, C, t, hidden_attributes)
 
-    return sigma_prime, disclosed_attributes, pi
-    
+    return DisclosureProof(sigma_prime, disclosed_attributes, pi)
 
 
 def verify_disclosure_proof(
         pk: PublicKey,
-        disclosure_proof: DisclosureProof,
-        message: bytes
+        disclosure_proof: DisclosureProof #,
+        # message: bytes
     ) -> bool:
     """ Verify the disclosure proof
 
     Hint: The verifier may also want to retrieve the disclosed attributes
     """
-    raise NotImplementedError()
+
+    if disclosure_proof.signature[0] == G1.neutral_element():
+        return False
+
+    L = len(pk.Y)
+
+    # Verify request ZKP
+    # recompute commitment
+    C = disclosure_proof.signature[1].pair(pk.g_tilde)
+    for attr_key, attr_val in disclosure_proof.disclosed_attributes.items():
+        C *= disclosure_proof.signature[0].pair(pk.Y_tilde[attr_key]) ** -attr_val
+    
+    C //= disclosure_proof.signature[0].pair(pk.X_tilde)
+
+    basis = (
+        disclosure_proof.signature[0].pair(pk.g_tilde),
+        [disclosure_proof.signature[0].pair(pk.Y_tilde[i]) for i in range(L)]
+    )
+
+    return verify_nizkp(basis, C, disclosure_proof.pi)

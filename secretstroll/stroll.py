@@ -4,11 +4,27 @@ Classes that you need to complete.
 
 from typing import Any, Dict, List, Union, Tuple
 
+from credential import (generate_key,
+                        create_issue_request, sign_issue_request, obtain_credential,
+                        create_disclosure_proof, verify_disclosure_proof)
+
 # Optional import
 from serialization import jsonpickle
 
 # Type aliases
 State = Any
+
+
+def serialize(
+        obj: Any
+    ) -> bytes:
+    return jsonpickle.encode(obj).encode()
+
+
+def deserialize(
+        data: bytes
+    ) -> Any:
+    return jsonpickle.decode(data.decode())
 
 
 class Server:
@@ -22,7 +38,8 @@ class Server:
         ###############################################
         # TODO: Complete this function.
         ###############################################
-        raise NotImplementedError
+        # raise NotImplementedError
+        pass
 
 
     @staticmethod
@@ -44,10 +61,10 @@ class Server:
             You are free to design this as you see fit, but the return types
             should be encoded as bytes.
         """
-        ###############################################
-        # TODO: Complete this function.
-        ###############################################
-        raise NotImplementedError
+        subscriptions.append("user_secret_key")
+        sk, pk = generate_key(subscriptions)
+
+        return serialize(sk), serialize(pk)
 
 
     def process_registration(
@@ -72,10 +89,19 @@ class Server:
             serialized response (the client should be able to build a
                 credential with this response).
         """
-        ###############################################
-        # TODO: Complete this function.
-        ###############################################
-        raise NotImplementedError
+        server_sk = deserialize(server_sk)
+        server_pk = deserialize(server_pk)
+        issuance_request = deserialize(issuance_request)
+
+        issuer_attributes = {
+            "username": int.from_bytes(username.encode(), "big")
+        }
+        issuer_attributes.update(dict(zip(subscriptions, [1 for _ in range(len(subscriptions))])))
+
+        blind_signature = sign_issue_request(server_sk, server_pk, issuance_request, issuer_attributes)
+        response = (blind_signature, issuer_attributes)
+
+        return serialize(response)
 
 
     def check_request_signature(
@@ -96,10 +122,17 @@ class Server:
         Returns:
             whether a signature is valid
         """
-        ###############################################
-        # TODO: Complete this function.
-        ###############################################
-        raise NotImplementedError
+        server_pk = deserialize(server_pk)
+        disclosure_proof = deserialize(signature)
+
+        # On top of checking the validity of the signature, we also have to check
+        # that the user is indeed subscribed to all the requested types
+        for attribute in revealed_attributes:
+            if attribute not in disclosure_proof or disclosure_proof[1][attribute] != 1:
+                return False
+
+        result = verify_disclosure_proof(server_pk, disclosure_proof, message)
+        return result
 
 
 class Client:
@@ -112,7 +145,8 @@ class Client:
         ###############################################
         # TODO: Complete this function.
         ###############################################
-        raise NotImplementedError()
+        # raise NotImplementedError()
+        pass
 
 
     def prepare_registration(
@@ -135,10 +169,22 @@ class Client:
                 from prepare_registration to proceed_registration_response.
                 You need to design the state yourself.
         """
-        ###############################################
-        # TODO: Complete this function.
-        ###############################################
-        raise NotImplementedError
+        server_pk = deserialize(server_pk)
+
+
+        # We're choosing option 5, so username is an issuer attribute
+        # user_attributes = {
+        #     "username": username,
+        # }
+        user_attributes = {
+            "user_secret_key": 1234 # TODO: check utility of this?
+        }
+        # Again, option 5 lets the issuer define the valid subscriptions
+        # user_attributes.update(dict(zip(subscriptions, [1 for _ in range(len(subscriptions))])))
+
+        issuance_request, t = create_issue_request(server_pk, user_attributes)
+
+        return serialize(issuance_request), (user_attributes, t)
 
 
     def process_registration_response(
@@ -158,10 +204,20 @@ class Client:
         Return:
             credentials: create an attribute-based credential for the user
         """
-        ###############################################
-        # TODO: Complete this function.
-        ###############################################
-        raise NotImplementedError
+        server_pk = deserialize(server_pk)
+        response = deserialize(server_response)
+
+        blind_signature = response[0]
+        issuer_attributes = response[1]
+
+        user_attributes = private_state[0]
+        t = private_state[1]
+
+        attributes = user_attributes | issuer_attributes
+
+        credential = obtain_credential(server_pk, blind_signature, t, attributes)
+
+        return serialize(credential)
 
 
     def sign_request(
@@ -182,7 +238,13 @@ class Client:
         Returns:
             A message's signature (serialized)
         """
-        ###############################################
-        # TODO: Complete this function.
-        ###############################################
-        raise NotImplementedError
+        server_pk = deserialize(server_pk)
+        credential = deserialize(credentials)
+
+        attributes = credential[1]
+        types = set(types)
+        hidden_attributes = [attribute for attribute in attributes if attribute not in types]
+
+        disclosure_proof = create_disclosure_proof(server_pk, credential, hidden_attributes, message)
+
+        return serialize(disclosure_proof)

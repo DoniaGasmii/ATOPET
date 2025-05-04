@@ -105,12 +105,14 @@ def test_malicious_attribute():
 
     # showing
     hidden_attributes = ["private_key", "gym", "cafe"] # only showing restaurant subscription
-    disclosure_proof = create_disclosure_proof(pk, credential, hidden_attributes, b"")
 
-    assert not verify_disclosure_proof(pk, disclosure_proof, b"", attribute_list)
+    message = b"SIGNED MESSAGE"
+    disclosure_proof = create_disclosure_proof(pk, credential, hidden_attributes, message)
+
+    assert not verify_disclosure_proof(pk, disclosure_proof, message, attribute_list)
 
 def test_different_message():
-    """ A request with an unsigned/malformed message does not pass verification """
+    """ Expected credential workflow works """
     attribute_list = ["private_key", "restaurant", "gym", "cafe"]
     sk, pk = generate_key(attribute_list)
 
@@ -128,12 +130,10 @@ def test_different_message():
 
     # disjoint* union of attributes
     attributes = user_attributes | issuer_attributes
-    attributes["gym"] = 1 # User tries to get a gym POI subscription for free
     credential = obtain_credential(pk, blind_signature, t, attributes)
 
     # showing
     hidden_attributes = ["private_key", "gym", "cafe"] # only showing restaurant subscription
-
     signed_message = b"THIS IS SIGNED"
     unsigned_message = b"THIS IS NOT SIGNED"
     disclosure_proof = create_disclosure_proof(pk, credential, hidden_attributes, signed_message)

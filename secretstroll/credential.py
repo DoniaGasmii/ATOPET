@@ -280,7 +280,7 @@ def sign_issue_request(
 
 
 def obtain_credential( 
-        pk: PublicKey,
+        # pk: PublicKey, # not needed
         response: BlindSignature,
         t: int,
         attributes: AttributeMap
@@ -289,7 +289,7 @@ def obtain_credential(
 
     This corresponds to the "Unblinding signature" step.
     """
-    return ((response[0], response[1] // (response[0] ** t)), attributes)
+    return AnonymousCredential((response[0], response[1] // (response[0] ** t)), attributes)
 
 
 ## SHOWING PROTOCOL ##
@@ -301,12 +301,10 @@ def create_disclosure_proof(
         message: bytes
     ) -> DisclosureProof:
     """ Create a disclosure proof """
-    L = len(pk.Y)
-
     r, t = G1.order().random(), G1.order().random()
 
-    sigma = credential[0]
-    attributes = credential[1]
+    sigma = credential.signature
+    attributes = credential.attributes
 
     hidden_attributes_set = set(hidden_attributes) # for efficiency
     disclosed_attributes = dict()
@@ -330,7 +328,7 @@ def create_disclosure_proof(
     # Compute zkp
     basis = (
         sigma_prime[0].pair(pk.g_tilde),
-        {attr_key: sigma_prime[0].pair(pk.Y_tilde[attr_key]) for attr_key in attributes}
+        {attr_key: sigma_prime[0].pair(pk.Y_tilde[attr_key]) for attr_key in pk.Y_tilde}
     )
     pi = nizkp(basis, C, t, hidden_attributes, message)
 
@@ -341,7 +339,6 @@ def verify_disclosure_proof(
         pk: PublicKey,
         disclosure_proof: DisclosureProof,
         message: bytes,
-        attribute_list: List[Attribute]
     ) -> bool:
     """ Verify the disclosure proof
 
@@ -350,8 +347,6 @@ def verify_disclosure_proof(
 
     if disclosure_proof.signature[0] == G1.neutral_element():
         return False
-
-    L = len(pk.Y)
 
     # Verify request ZKP
     # recompute commitment
@@ -363,7 +358,7 @@ def verify_disclosure_proof(
 
     basis = (
         disclosure_proof.signature[0].pair(pk.g_tilde),
-        {attr_key: disclosure_proof.signature[0].pair(pk.Y_tilde[attr_key]) for attr_key in attribute_list}
+        {attr_key: disclosure_proof.signature[0].pair(pk.Y_tilde[attr_key]) for attr_key in pk.Y_tilde}
     )
 
     return verify_nizkp(basis, C, disclosure_proof.pi, message)

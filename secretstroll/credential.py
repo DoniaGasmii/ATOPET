@@ -52,7 +52,7 @@ class IssueRequest(NamedTuple):
     pi: Any
 
 class CommitmentProof(NamedTuple):
-    T: GElement
+    # T: GElement
     k: int
     s0: int
     ts: Dict[int, int]
@@ -89,7 +89,8 @@ def nizkp(
         basis: Tuple[GElement, Dict[str, GElement]],
         C: GElement,
         t: int,
-        attributes: AttributeMap
+        attributes: AttributeMap,
+        message: bytes = b""
     ) -> CommitmentProof:
     """ Compute non-interactive zero-knowledge proof of knowledge of secrets t and attributes """
     # ZKP
@@ -101,30 +102,38 @@ def nizkp(
         ts[attr_key] = current_t
         T *= basis[1][attr_key] ** current_t
     
-    string_to_hash = f"{basis[0]}{[(attr_key, basis[1][attr_key]) for attr_key in attributes]}{C}{T}"
+    hash_input = f"{basis}{C}{T}".encode() + message
     # We use shake_256 as an extendable output function to make sure the hash output has the same bit length
     # as the group order, to avoid statistical bias when reducing modulo the group order.
-    k = shake_256(string_to_hash.encode()).digest(int(G1.order()).bit_length())
+    k = shake_256(hash_input).digest(int(G1.order()).bit_length())
     k = int.from_bytes(k, "big") % G1.order()
 
     s0 = (k * t + t0) % G1.order()
     for elem in ts:
         ts[elem] = (k * attributes[elem] + ts[elem]) % G1.order()
 
-    return CommitmentProof(T, k, s0, ts)
+    # return CommitmentProof(T, k, s0, ts)
+    return CommitmentProof(k, s0, ts)
 
 
 def verify_nizkp(
         basis: Tuple[GElement, Dict[str, GElement]],
         C: GElement,
-        pi: CommitmentProof
+        pi: CommitmentProof,
+        message: bytes = b""
     ) -> bool:
     """ Verify non-interactive zero-knowledge proof """
-    prod = basis[0] ** pi.s0
+    T_prime = basis[0] ** pi.s0
     for attr_key, attr_val in pi.ts.items():
-        prod *= basis[1][attr_key] ** attr_val
+        T_prime *= basis[1][attr_key] ** attr_val
 
-    return prod == C ** pi.k * pi.T
+    T_prime *= (C ** pi.k).inverse()
+
+    hash_input = f"{basis}{C}{T_prime}".encode() + message
+    k = shake_256(hash_input).digest(int(G1.order()).bit_length())
+    k = int.from_bytes(k, "big") % G1.order()
+
+    return pi.k == k
 
 ######################
 ## SIGNATURE SCHEME ##
@@ -239,7 +248,11 @@ def sign_issue_request(
     This corresponds to the "Issuer signing" step in the issuance protocol.
     """
     # Verify request ZKP
-    assert verify_nizkp((pk.g, pk.Y), request.C, request.pi), "User commitment correct computation zero-knowledge proof verification failed."
+    basis = (
+        pk.g,
+        pk.Y
+    )
+    assert verify_nizkp(basis, request.C, request.pi), "User commitment correct computation zero-knowledge proof verification failed."
 
     # Sign
     # This part could be "simplified" to the following if we overlook the difference
@@ -285,7 +298,7 @@ def create_disclosure_proof(
         pk: PublicKey,
         credential: AnonymousCredential,
         hidden_attributes: List[Attribute],
-        message: bytes # TODO: I think these might be the disclosed attributes?
+        message: bytes
     ) -> DisclosureProof:
     """ Create a disclosure proof """
     L = len(pk.Y)
@@ -319,7 +332,7 @@ def create_disclosure_proof(
         sigma_prime[0].pair(pk.g_tilde),
         {attr_key: sigma_prime[0].pair(pk.Y_tilde[attr_key]) for attr_key in attributes}
     )
-    pi = nizkp(basis, C, t, hidden_attributes)
+    pi = nizkp(basis, C, t, hidden_attributes, message)
 
     return DisclosureProof(sigma_prime, disclosed_attributes, pi)
 
@@ -348,10 +361,9 @@ def verify_disclosure_proof(
     
     C //= disclosure_proof.signature[0].pair(pk.X_tilde)
 
-    hidden_attributes = [attr_key for attr_key in attribute_list if attr_key not in disclosure_proof.disclosed_attributes]
     basis = (
         disclosure_proof.signature[0].pair(pk.g_tilde),
-        {attr_key: disclosure_proof.signature[0].pair(pk.Y_tilde[attr_key]) for attr_key in hidden_attributes}
+        {attr_key: disclosure_proof.signature[0].pair(pk.Y_tilde[attr_key]) for attr_key in attribute_list}
     )
 
-    return verify_nizkp(basis, C, disclosure_proof.pi)
+    return verify_nizkp(basis, C, disclosure_proof.pi, message)

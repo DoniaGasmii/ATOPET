@@ -48,9 +48,12 @@ def test_correct_credential():
 
     # showing
     hidden_attributes = ["private_key", "gym", "cafe"] # only showing restaurant subscription
-    disclosure_proof = create_disclosure_proof(pk, credential, hidden_attributes, b"")
 
-    assert verify_disclosure_proof(pk, disclosure_proof, b"", attribute_list)
+    message = b"SIGNED MESSAGE"
+    disclosure_proof = create_disclosure_proof(pk, credential, hidden_attributes, message)
+
+    assert verify_disclosure_proof(pk, disclosure_proof, message, attribute_list)
+
 
 def test_incorrect_credential():
     """ A user cannot show their credential successfully to a verifier that isn't related to the issuer """
@@ -76,10 +79,13 @@ def test_incorrect_credential():
 
     # showing
     hidden_attributes = ["private_key", "gym", "cafe"] # only showing restaurant subscription
-    disclosure_proof = create_disclosure_proof(pk1, credential, hidden_attributes, b"")
+
+    message = b"SIGNED MESSAGE"
+    disclosure_proof = create_disclosure_proof(pk1, credential, hidden_attributes, message)
 
     # checks with another public key, as if verifier was not related to issuer
-    assert not verify_disclosure_proof(pk2, disclosure_proof, b"", attribute_list)
+    assert not verify_disclosure_proof(pk2, disclosure_proof, message, attribute_list)
+
 
 def test_malicious_attribute():
     """ A user can't modify an issuer-defined attribute """
@@ -110,6 +116,7 @@ def test_malicious_attribute():
     disclosure_proof = create_disclosure_proof(pk, credential, hidden_attributes, message)
 
     assert not verify_disclosure_proof(pk, disclosure_proof, message, attribute_list)
+
 
 def test_different_message():
     """ Expected credential workflow works """

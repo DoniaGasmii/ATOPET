@@ -15,7 +15,7 @@ resembles the original scheme definition. However, you are free to restructure
 the functions provided to resemble a more object-oriented interface.
 """
 
-from typing import Any, List, Tuple, NamedTuple, Dict
+from typing import Any, List, Tuple, NamedTuple, Dict, Union
 
 from serialization import jsonpickle
 
@@ -27,23 +27,25 @@ from hashlib import shake_256 # for arbitrary output size hash output, to avoid 
 # Type hint aliases
 # Feel free to change them as you see fit.
 # Maybe at the end, you will not need aliases at all!
-GElement = G1Element | G2Element | GTElement
+GElement = Union[G1Element, G2Element, GTElement]
 
 class SecretKey(NamedTuple):
     x: int
     X: G1Element
-    y: List[int]
+    y: Dict[str, int]
 
 class PublicKey(NamedTuple):
     g: G1Element
-    Y: List[G1Element]
+    Y: Dict[str, G1Element]
     g_tilde: G2Element
     X_tilde: G2Element
-    Y_tilde: List[G2Element]
+    Y_tilde: Dict[str, G2Element]
 
 Signature = Tuple[G1Element, G1Element]
-Attribute = int
-AttributeMap = Dict[int, Attribute]
+Attribute = str
+# Once attributes are defined in the scheme context in key generation
+# we use the type AttributeMap to map attribute_name -> attribute_val
+AttributeMap = Dict[Attribute, int]
 
 class IssueRequest(NamedTuple):
     C: G1Element
@@ -84,7 +86,7 @@ def random_generator(
 
 
 def nizkp(
-        basis: Tuple[GElement, List[GElement]],
+        basis: Tuple[GElement, Dict[str, GElement]],
         C: GElement,
         t: int,
         attributes: AttributeMap
@@ -100,7 +102,8 @@ def nizkp(
         T *= basis[1][attr_key] ** current_t
     
     string_to_hash = f"{basis[0]}{[(attr_key, basis[1][attr_key]) for attr_key in attributes]}{C}{T}"
-    # We use shake_256 as an extendable output function to make sure the hash output has the same bit length as the group order
+    # We use shake_256 as an extendable output function to make sure the hash output has the same bit length
+    # as the group order, to avoid statistical bias when reducing modulo the group order.
     k = shake_256(string_to_hash.encode()).digest(int(G1.order()).bit_length())
     k = int.from_bytes(k, "big") % G1.order()
 
@@ -112,7 +115,7 @@ def nizkp(
 
 
 def verify_nizkp(
-        basis: Tuple[GElement, List[GElement]],
+        basis: Tuple[GElement, Dict[str, GElement]],
         C: GElement,
         pi: CommitmentProof
     ) -> bool:
@@ -129,14 +132,12 @@ def verify_nizkp(
 
 def generate_key(
         attributes: List[Attribute]
-    ) -> Tuple[PublicKey, SecretKey]:
+    ) -> Tuple[SecretKey, PublicKey]:
     """ Generate signer key pair """
-    L = len(attributes)
-
     x = G1.order().random()
-    y = []
-    for i in range(L):
-        y.append(G1.order().random())
+    y = dict()
+    for attr_key in attributes:
+        y[attr_key] = G1.order().random()
 
     g = random_generator(G1, G1.generator())
     g_tilde = random_generator(G2, G2.generator())
@@ -144,13 +145,13 @@ def generate_key(
     X = g ** x
     X_tilde = g_tilde ** x
 
-    Y = []
-    Y_tilde = []
-    for i in range(L):
-        Y.append(g ** y[i])
-        Y_tilde.append(g_tilde ** y[i])
+    Y = dict()
+    Y_tilde = dict()
+    for attr_key, attr_val in y.items():
+        Y[attr_key] = g ** attr_val
+        Y_tilde[attr_key] = g_tilde ** attr_val
 
-    return PublicKey(g, Y, g_tilde, X_tilde, Y_tilde), SecretKey(x, X, y)
+    return SecretKey(x, X, y), PublicKey(g, Y, g_tilde, X_tilde, Y_tilde)
 
 
 def sign(
@@ -159,11 +160,12 @@ def sign(
     ) -> Signature:
     """ Sign the vector of messages `msgs` """
     L = len(msgs)
+    y = list(sk.y.values()) # deterministic since sk.y is never modified so not a problem
 
     h = random_generator(G1, G1.generator())
     exp2 = sk.x
     for i in range(L):
-        exp2 += sk.y[i] * int.from_bytes(msgs[i], "big")
+        exp2 += y[i] * int.from_bytes(msgs[i], "big")
 
     return (h, h ** exp2)
 
@@ -178,11 +180,12 @@ def verify(
         return False
     
     L = len(msgs)
+    Y_tilde = list(pk.Y_tilde.values()) # deterministic since pk.Y_tilde is never modified so not a problem
 
     # Left hand side
     prod = pk.X_tilde
     for i in range(L):
-        prod *= pk.Y_tilde[i] ** int.from_bytes(msgs[i], "big")
+        prod *= Y_tilde[i] ** int.from_bytes(msgs[i], "big")
 
     lhs = signature[0].pair(prod)
 
@@ -253,8 +256,8 @@ def sign_issue_request(
     left = pk.g ** u
 
     right = sk.X * request.C
-    for attribute in issuer_attributes:
-        right *= pk.Y[attribute] ** issuer_attributes[attribute]
+    for attr_key, attr_val in issuer_attributes.items():
+        right *= pk.Y[attr_key] ** attr_val
 
     right **= u
 
@@ -273,7 +276,6 @@ def obtain_credential(
 
     This corresponds to the "Unblinding signature" step.
     """
-    # return (response[0], response[1] * (response[0].inverse() ** t))
     return ((response[0], response[1] // (response[0] ** t)), attributes)
 
 
@@ -282,8 +284,8 @@ def obtain_credential(
 def create_disclosure_proof(
         pk: PublicKey,
         credential: AnonymousCredential,
-        hidden_attributes: List[Attribute] #,
-        # message: bytes
+        hidden_attributes: List[Attribute],
+        message: bytes # TODO: I think these might be the disclosed attributes?
     ) -> DisclosureProof:
     """ Create a disclosure proof """
     L = len(pk.Y)
@@ -293,9 +295,14 @@ def create_disclosure_proof(
     sigma = credential[0]
     attributes = credential[1]
 
-    hidden_attributes = set(hidden_attributes) # for efficiency
-    disclosed_attributes = {k: v for k, v in attributes.items() if k not in hidden_attributes}
-    hidden_attributes = {k: v for k, v in attributes.items() if k in hidden_attributes}
+    hidden_attributes_set = set(hidden_attributes) # for efficiency
+    disclosed_attributes = dict()
+    hidden_attributes = dict()
+    for k, v in attributes.items():
+        if k in hidden_attributes_set:
+            hidden_attributes[k] = v
+        else:
+            disclosed_attributes[k] = v
 
     sigma_prime: Signature = (sigma[0] ** r, (sigma[1] * sigma[0] ** t) ** r)
 
@@ -310,7 +317,7 @@ def create_disclosure_proof(
     # Compute zkp
     basis = (
         sigma_prime[0].pair(pk.g_tilde),
-        [sigma_prime[0].pair(pk.Y_tilde[i]) for i in range(L)]
+        {attr_key: sigma_prime[0].pair(pk.Y_tilde[attr_key]) for attr_key in attributes}
     )
     pi = nizkp(basis, C, t, hidden_attributes)
 
@@ -319,8 +326,9 @@ def create_disclosure_proof(
 
 def verify_disclosure_proof(
         pk: PublicKey,
-        disclosure_proof: DisclosureProof #,
-        # message: bytes
+        disclosure_proof: DisclosureProof,
+        message: bytes,
+        attribute_list: List[Attribute]
     ) -> bool:
     """ Verify the disclosure proof
 
@@ -340,9 +348,10 @@ def verify_disclosure_proof(
     
     C //= disclosure_proof.signature[0].pair(pk.X_tilde)
 
+    hidden_attributes = [attr_key for attr_key in attribute_list if attr_key not in disclosure_proof.disclosed_attributes]
     basis = (
         disclosure_proof.signature[0].pair(pk.g_tilde),
-        [disclosure_proof.signature[0].pair(pk.Y_tilde[i]) for i in range(L)]
+        {attr_key: disclosure_proof.signature[0].pair(pk.Y_tilde[attr_key]) for attr_key in hidden_attributes}
     )
 
     return verify_nizkp(basis, C, disclosure_proof.pi)

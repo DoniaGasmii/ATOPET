@@ -39,3 +39,5 @@ urllib3==1.26.14
 Werkzeug==2.2.3
 wrapt==1.14.1
 zipp==3.13.0
+pandas==2.2.3
+folium==0.19.5

@@ -1,4 +1,4 @@
 can we modify requirements.txt ?
-can we assume that the adversary can link ip address to real life identity
+can we assume that the adversary can link ip address to real life identity or does he know info and needs to link ip to identity
 can we assume that the adversary is targeting one person not the dataset as a whole ?
 (need to know to calculate the cost)

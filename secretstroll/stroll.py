@@ -128,7 +128,7 @@ class Server:
         # On top of checking the validity of the signature, we also have to check
         # that the user is indeed subscribed to all the requested types
         for attribute in revealed_attributes:
-            if attribute not in disclosure_proof or disclosure_proof[1][attribute] != 1:
+            if attribute not in disclosure_proof[1] or disclosure_proof[1][attribute] != 1:
                 return False
 
         result = verify_disclosure_proof(server_pk, disclosure_proof, message)

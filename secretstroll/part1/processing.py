@@ -136,24 +136,17 @@ data = {
     "100": 2538
 }
 
-# Prepare x and y
 x = list(map(int, data.keys()))
 y = [data[str(k)] for k in x]
 
-# Create a square figure (5"x5")
 fig, ax = plt.subplots(figsize=(5, 5))
 
-# Plot the data
 ax.plot(x, y, marker='o', linestyle='-')
 ax.set_xlabel('Attributes disclosed')
 ax.set_ylabel('Communication cost (bytes)')
 ax.grid(True)
 
-# Optionally save as SVG
 fig.savefig('plot_extra.svg', format='svg', bbox_inches='tight')
 
 plt.show()
 
-
-
-# process_showing()

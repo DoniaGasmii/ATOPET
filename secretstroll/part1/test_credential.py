@@ -1,3 +1,11 @@
+# to import from parent directory...
+import sys
+import os
+
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
 from credential import (generate_key, sign, verify,
                         create_issue_request, sign_issue_request, obtain_credential,
                         create_disclosure_proof, verify_disclosure_proof)

@@ -128,7 +128,7 @@ class Server:
         # On top of checking the validity of the signature, we also have to check
         # that the user is indeed subscribed to all the requested types
         for attribute in revealed_attributes:
-            if attribute not in disclosure_proof or disclosure_proof[1][attribute] != 1:
+            if attribute not in disclosure_proof[1] or disclosure_proof[1][attribute] != 1:
                 return False
 
         result = verify_disclosure_proof(server_pk, disclosure_proof, message)
@@ -172,15 +172,13 @@ class Client:
         server_pk = deserialize(server_pk)
 
 
-        # We're choosing option 5, so username is an issuer attribute
+        # We're choosing option 1, so username is an issuer attribute
         # user_attributes = {
         #     "username": username,
         # }
         user_attributes = {
             "user_secret_key": 1234 # TODO: check utility of this?
         }
-        # Again, option 5 lets the issuer define the valid subscriptions
-        # user_attributes.update(dict(zip(subscriptions, [1 for _ in range(len(subscriptions))])))
 
         issuance_request, t = create_issue_request(server_pk, user_attributes)
 

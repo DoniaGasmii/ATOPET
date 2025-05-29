@@ -280,7 +280,7 @@ def sign_issue_request(
 
 
 def obtain_credential( 
-        # pk: PublicKey, # not needed
+        pk: PublicKey, # not needed
         response: BlindSignature,
         t: int,
         attributes: AttributeMap

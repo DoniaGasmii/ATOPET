@@ -5,7 +5,7 @@ import pyshark
 
 # === CONFIG ===
 TRACE_DIR = "trace_dataset"
-OUTPUT_CSV = "traffic_features_debug.csv"
+OUTPUT_CSV = "traffic_features.csv"
 NUM_CELLS = 100
 TRIALS_PER_CELL = 100
 BATCH_SIZE = 20

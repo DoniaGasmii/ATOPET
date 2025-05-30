@@ -44,3 +44,5 @@ folium==0.19.5
 numpy~=2.2.5
 scikit-learn~=1.6.1
 matplotlib~=3.10.3
+seaborn~=0.13.2 
+pyshark~=0.6.5  

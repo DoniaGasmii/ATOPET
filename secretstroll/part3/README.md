@@ -50,5 +50,26 @@ ls /traffic_analysis/trace_dataset
 ```
 The cell folders containing the .pcap trace files should appear here.
 
+## How to Extract Features from Traces
+After running `collect_traces.sh`, you can extract features from the collected .pcap traces:
+```
+cd part3/traffic_analysis
+python extract_features.py
+```
+This will generate: `traffic_features.csv`, containing the extracted features ready for training the fingerprinting model.
+
+## How to Train and Evaluate the Fingerprinting Classifier
+Once you have extracted the features, you can train and evaluate the fingerprinting classifier:
+```
+cd part3
+python fingerprinting.py
+```
+This will:
+
+* Load `traffic_analysis/traffic_features.csv`.
+* Perform 10-fold cross-validation.
+* Display evaluation metrics in the terminal:
+
+
 
     

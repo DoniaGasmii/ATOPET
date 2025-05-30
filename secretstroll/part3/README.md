@@ -3,7 +3,6 @@
 This folder contains the full implementation of Part 3 of the project: a network traffic analysis attack to infer the cell ID queried by a user of the SecretStroll app.
 
 ## Files in this repository
-This folder contains the full implementation of Part 3:
 
 - `client.py` / `server.py` / `stroll.py` / `credential.py` / `serialization.py` — Core SecretStroll components.
 - `docker-compose.yaml` — Launches client and server containers with Tor routing.

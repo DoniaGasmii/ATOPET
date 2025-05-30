@@ -1,3 +1,15 @@
+# Ignore raw traces and generated data
+secretstroll/traffic_analysis/trace_dataset/
+secretstroll/traffic_analysis/traffic_features.csv
+secretstroll/traffic_analysis/traffic_features_noisy.csv
+
+# Ignore Jupyter notebook checkpoints
+secretstroll/traffic_analysis/.ipynb_checkpoints/
+
+# Ignore temporary files
+*.pyc
+__pycache__/
+
 .venv
 __pycache__
 key*

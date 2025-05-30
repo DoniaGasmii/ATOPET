@@ -40,13 +40,13 @@ python3 client.py get-pk
 python3 client.py register -u student -S restaurant -S bar -S dojo
 python3 client.py grid 42 -T restaurant    # (optional test query)
 ```
-# Now run trace collection:
+### Now run trace collection:
 ```
 bash collect_traces.sh
 ```
 Check results
 ls /traffic_analysis/trace_dataset
-✅ The .pcap trace files should appear here.
+The .pcap trace files should appear here.
 
 
     

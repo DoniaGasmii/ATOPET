@@ -10,7 +10,7 @@ set -euo pipefail
 TRACE_DIR=/client/traffic_analysis/trace_dataset3
 NETWORK_IFACE=eth0
 PCAP_FILTER='not port 9050'
-NUM_TRIALS=20  # Number of queries per cell
+NUM_TRIALS=100  # Number of queries per cell
 
 mkdir -p "$TRACE_DIR"
 

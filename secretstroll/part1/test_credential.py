@@ -1,4 +1,3 @@
-# to import from parent directory...
 import sys
 import os
 

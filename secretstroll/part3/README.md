@@ -3,7 +3,7 @@
 This folder contains the full implementation of Part 3 of the project: a network traffic analysis attack to infer the cell ID queried by a user of the SecretStroll app.
 
 ## Structure
-
+`
 part3/
 │
 ├── client.py / server.py / stroll.py / credential.py / serialization.py   # Core SecretStroll components
@@ -17,4 +17,5 @@ part3/
     ├── traffic_features_analysis.ipynb      # Optional notebook for visualization
     ├──trace_dataset/ (generated)   # Collected `.pcap` traffic traces (created by `collect_traces.sh`)
     └── traffic_features.csv (generated)     # Extracted features for training
+`
     

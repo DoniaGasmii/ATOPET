@@ -45,8 +45,10 @@ python3 client.py grid 42 -T restaurant    # (optional test query)
 bash collect_traces.sh
 ```
 Check results
+```
 ls /traffic_analysis/trace_dataset
-The .pcap trace files should appear here.
+```
+The cell folders containing the .pcap trace files should appear here.
 
 
     

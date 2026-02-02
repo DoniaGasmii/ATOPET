@@ -1,3 +1,14 @@
+**Project Submissions for CS-523 – Advanced Topics in Privacy Enhancing Technologies (EPFL, Fall 2024)**  
+This repository includes our team's completed projects for EPFL’s CS-523 course, which covers applied cryptography, secure computation, and metadata-resistant systems.  
+
+We submitted two projects:  
+- **SecretStroll**: A privacy-preserving authentication protocol with strong metadata resistance (graded **100/100**)  
+- **SMCompiler**: A secure multiparty computation compiler with formal guarantees (graded **87/100**)  
+
+Reports are available at [`secretstroll/report.pdf`](./secretstroll/report.pdf) and [`smcompiler/Report.pdf`](./smcompiler/Report.pdf).  
+These works reflect our efforts to bridge theoretical privacy concepts with practical system implementation.
+
+======================
 Public Repo for CS-523 Projects
 ======================
 
@@ -36,6 +47,7 @@ Using a virtual machine is optional for this project. However, we provide two VM
 **Only 1 member per team** needs to upload their project submissions via moodle. 
 
 In the final report of each project, there must contain a paragraph describing the contributions of each team member. Here is [an example of such a paragraph](https://www.epj.org/images/stories/faq/examples-of-author-contributions.pdf). 
+
 
 
 
